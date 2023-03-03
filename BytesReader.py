@@ -27,7 +27,7 @@ def read_list_of_sector(file_object, sector_list: list, bytes_per_sector = 512) 
         result += read_sector(file_object, sector, 1, bytes_per_sector)
     return result
 
-def read_bytes_from_buffer(buffer, offset, size) -> bytes:
+def read_bytes_from_buffer(buffer, offset, size = 1) -> bytes:
     '''
     Hàm slice một chuỗi bytes thành một chuỗi bytes con
         buffer: chuỗi bytes cần slice
