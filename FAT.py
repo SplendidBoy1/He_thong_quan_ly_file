@@ -22,6 +22,10 @@ class FATVolume():
     """First sector of data, which calculate by sum sb + nf*sf"""
     end_number = None
     """End number to detect a error"""
+    size_volume = None
+    """
+    size of volume is sv = 0 (sv > 65535) at 0x20, 4 bytes
+    """
     
     def __init__(self, file_object):
         self.file_object = file_object
@@ -41,9 +45,11 @@ class FATVolume():
         self.nf = read_number_from_buffer(bootsec_buffer, 0x10, 1)
         self.sf = read_number_from_buffer(bootsec_buffer, 0x24, 4)
         self.root_cluster = read_number_from_buffer(bootsec_buffer, 0x2C, 4)
+        self.size_volume = read_number_from_buffer(bootsec_buffer, 0x20, 4)
         self.data_begin_cluster = self.sb + self.nf * self.sf
     
     def show_infor_volume(self):
+        print('\n')
         print('Information of Volume:')
         print('Bytes per sector (bps): ', self.bps)
         print('Sector per cluster (sc): ', self.sc)
@@ -52,6 +58,7 @@ class FATVolume():
         print('Size of each FAT table (sf): ', self.sf)
         print('RDET cluster: ', self.root_cluster)
         print('The first sector in data: ', self.data_begin_cluster)
+        print('Size of volume: ', self.size_volume)
         return
 
         
