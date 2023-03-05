@@ -5,6 +5,8 @@ import sys
 import os
 
 
+"""luckytea"""
+
 class menu():
     file_object = None
     volume = None

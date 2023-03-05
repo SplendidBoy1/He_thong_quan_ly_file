@@ -26,6 +26,7 @@ class FATVolume():
     """
     size of volume is sv = 0 (sv > 65535) at 0x20, 4 bytes
     """
+    fat_table = None
     
     def __init__(self, file_object):
         self.file_object = file_object
@@ -35,7 +36,6 @@ class FATVolume():
         #read end number (0xAA55 = 43605)
         #read 2 byte at offset 0x1FA
         self.end_number = read_number_from_buffer(bootsec_buffer, 0x1FE, 2)
-        print(self.end_number)
         if self.end_number != 43605:
             print('Invalid boot sector (error because end number not found ar 0x1FE)')
         
@@ -47,6 +47,7 @@ class FATVolume():
         self.root_cluster = read_number_from_buffer(bootsec_buffer, 0x2C, 4)
         self.size_volume = read_number_from_buffer(bootsec_buffer, 0x20, 4)
         self.data_begin_cluster = self.sb + self.nf * self.sf
+        self.fat_table = read_sector(file_object, self.sb, self.sf, self.bps)
     
     def show_infor_volume(self):
         print('\n')
@@ -60,7 +61,31 @@ class FATVolume():
         print('The first sector in data: ', self.data_begin_cluster)
         print('Size of volume: ', self.size_volume)
         return
+    
+    def read_cluster_from_fat(self, n) -> list:
+        """Function check from FAT table to find a cluster in one exactly entry, begining which a the n-th cluster that given
 
+        Args:
+            n (integer): 
+
+        Returns:
+            list: _a cluster (which combine a lot of sectors_
+        """
+        #Sign of end in cluster
+        end_sign = [0xFFFFFFF, 0xFFFFFF7, 0xFFFFFF8]
+        if n in end_sign:
+            return []
+        next_cluster = n
+        chain = [next_cluster]
+        
+        while True:
+            next_cluster = read_number_from_buffer(self.fat_table, next_cluster * 4, 4)
+            if next_cluster in end_sign:
+                break
+            else:
+                chain.append(next_cluster)
+        return chain
         
         
-        
+class FATItem():
+    pass
