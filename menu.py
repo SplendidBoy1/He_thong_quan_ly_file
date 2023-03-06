@@ -25,11 +25,13 @@ class menu():
         if b'FAT32' in fat32_test:
             self.volume = FATVolume(self.file_object)
             print('FAT32 was detected as a type of format volume')
+            
         elif b'NTFS' in ntfs_test:
             self.volume = NTFSVolume(self.file_object)
             print('NTFS was detected as a type of format volume')
             """ Add statement in there to detect NTFS"""
             sys.exit(0)
+        print('\n')
     
     def show(self):
         print('MENU')
@@ -75,6 +77,7 @@ def input_directory():
             print('Enter the path of the volume. Exp: /dev/disk1, ...')
             address_path = input('=> Enter your address path')
         print(address_path)
+        print('\n')
         return address_path
             
 def fileobject_to_read(address_path):

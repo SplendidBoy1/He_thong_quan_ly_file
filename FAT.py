@@ -1,4 +1,5 @@
 from BytesReader import *
+from Class import *
 import os
 
 class FATVolume():
@@ -27,6 +28,10 @@ class FATVolume():
     size of volume is sv = 0 (sv > 65535) at 0x20, 4 bytes
     """
     fat_table = None
+    """
+    FAT table
+    """
+    rdet_data = None
     
     def __init__(self, file_object):
         self.file_object = file_object
@@ -47,7 +52,12 @@ class FATVolume():
         self.root_cluster = read_number_from_buffer(bootsec_buffer, 0x2C, 4)
         self.size_volume = read_number_from_buffer(bootsec_buffer, 0x20, 4)
         self.data_begin_cluster = self.sb + self.nf * self.sf
+        #
         self.fat_table = read_sector(file_object, self.sb, self.sf, self.bps)
+        #RDET data
+        rdet_clusters_chain = self.read_cluster_from_fat(self.root_cluster)
+        rdet_sector_chain = self.change_cluster_chain_to_sector_chain(rdet_clusters_chain)
+        self.rdet_data = read_list_of_sector(self.file_object, rdet_sector_chain, self.bps)
     
     def show_infor_volume(self):
         print('\n')
@@ -86,6 +96,101 @@ class FATVolume():
                 chain.append(next_cluster)
         return chain
         
+    def change_cluster_chain_to_sector_chain(self, cluster_chain):
+        """Fucntion change a cluster chain to sector chain
+
+        Args:
+            cluster_chain (_list_): all cluster which store as a list 
+        """
         
-class FATItem():
+        sector_chain = []
+        for each_cluster in cluster_chain:
+            begin_sector = self.data_begin_cluster + (each_cluster - 2)*self.sc
+            for sector in range(begin_sector, begin_sector + self.sc):
+                sector_chain.append(sector)
+        return sector_chain
+            
+    @staticmethod
+    def read_subentry_to_name(subentries: list):
+        """Function  that combine subentries to give information of file or folder
+
+        Args:
+            subentries (list): _list of subentries_
+        """
+        name = b''
+        for subentry in subentries:
+            name += read_bytes_from_buffer(subentry, 0x1, 10)
+            name += read_bytes_from_buffer(subentry, 0xE, 12)
+            name += read_bytes_from_buffer(subentry, 0x1C, 4)
+        name = name.decode('utf-8')
+        if name.find('NULL') > 0:
+            name = name[:name.find('NULL')]
+        return name
+            
+            
+class FATDirectory(Directory):
+    """
+    Object that illustrate folder in FAT system
+    """
+    #Define some attributes
+    main_entry_of_rdet = None
+    volume = None
+    subentries = None
+    name = None
+    attr = None
+    sectors = None
+    path_address = None
+    cluster_begin = None
+    
+    def __init__(self, rdet_data, parrent_path, volume, isrdet = False, list_entries = []):
+        #rdet_data: main entry
+        self.main_entry_of_rdet = rdet_data
+        self.volume = volume
+        #list of subentries
+        self.subentries = None
+        
+        if not isrdet:
+            if len(list_entries) > 0:
+                list_entries.reverse()
+                self.name = FATVolume.read_subentry_to_name(list_entries)
+                list_entries.clear()
+            else:
+                self.name = read_bytes_from_buffer(self.main_entry_of_rdet, 0, 8)
+                self.name += read_bytes_from_buffer(self.main_entry_of_rdet, 8, 3)
+                self.name = self.name.decode('utf-8')
+            
+            self.attr = read_number_from_buffer(self.main_entry_of_rdet, 0xB, 1)
+            highbyte = read_number_from_buffer(self.main_entry_of_rdet, 0x1B, 2)
+            lowbyte = read_number_from_buffer(self.main_entry_of_rdet, 0x1A, 2)
+            self.cluster_begin = highbyte * 0x100 + lowbyte
+            self.path_address = parrent_path + '/' + self.name
+        else:
+            self.name = read_bytes_from_buffer(self.main_entry_of_rdet, 0, 8)
+            self.name += read_bytes_from_buffer(self.main_entry_of_rdet, 8, 3)
+            self.name = self.name.decode('utf-8')
+            self.cluster_begin = self.volume.root_cluster
+            self.path = ''
+            
+        chain_cluster = self.volume.read_cluster_from_fat(self.cluster_begin)
+        self.sectors = self.volume.change_cluster_chain_to_sector_chain(self, chain_cluster)
+        
+    def build_tree(self):
+        pass
+        
+    def show_attr(self):
+        check = {
+            16: 'D',
+            32: 'A',
+            1: 'R',
+            2: 'H',
+            4: 'S',
+            8: 'V'
+        }
+        list_attr = []
+        for attr in check:
+            if self.attr & attr == attr:
+                list_attr.append(check[attr])
+        return list_attr
+        
+class FATFile(File):
     pass
