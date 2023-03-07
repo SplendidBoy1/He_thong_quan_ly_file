@@ -1,6 +1,6 @@
 from BytesReader import *
 from FAT import *
-from NTFS import *
+from NTFS_ import *
 import sys
 import os
 
