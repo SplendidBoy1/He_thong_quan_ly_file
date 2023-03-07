@@ -140,11 +140,10 @@ class FATDirectory(Directory):
     attr = None
     sectors = None
     path_address = None
-    cluster_begin = None
     
-    def __init__(self, rdet_data, parrent_path, volume, isrdet = False, list_entries = []):
-        #rdet_data: main entry
-        self.main_entry_of_rdet = rdet_data
+    
+    def __init__(self, main_entry, parrent_path, volume, isrdet = False, list_entries = []):
+        self.main_entry_of_rdet = main_entry
         self.volume = volume
         #list of subentries
         self.subentries = None
@@ -193,4 +192,60 @@ class FATDirectory(Directory):
         return list_attr
         
 class FATFile(File):
-    pass
+    main_entry_of_rdet = None
+    volume = None
+    subentries = None
+    name = None
+    attr = None
+    sectors = None
+    path_address = None
+    size = None
+    
+    def __init__(self, main_entry, parrent_path, volume, isrdet = False, list_entries = []):
+        self.main_entry_of_rdet = main_entry
+        self.volume = volume
+        
+        #attributes
+        self.attr = read_number_from_buffer(self.main_entry_of_rdet, 0xB, 1)
+        
+        #name
+        if len(list_entries) > 0:
+            list_entries.reverse()
+            self.name = FATVolume.read_subentry_to_name(list_entries)
+            list_entries.clear()
+        else:
+            self.name = read_bytes_from_buffer(self.main_entry_of_rdet, 0, 8)
+            self.name += '.'
+            self.name += read_bytes_from_buffer(self.main_entry_of_rdet, 8, 3)
+            self.name = self.name.decode('utf-8').strip()
+            
+        self.attr = read_number_from_buffer(self.main_entry_of_rdet, 0xB, 1)
+        highbyte = read_number_from_buffer(self.main_entry_of_rdet, 0x1B, 2)
+        lowbyte = read_number_from_buffer(self.main_entry_of_rdet, 0x1A, 2)
+        self.cluster_begin = highbyte * 0x100 + lowbyte
+        self.path_address = parrent_path + '/' + self.name
+        chain_cluster = self.volume.read_cluster_from_fat(self.cluster_begin)
+        self.sectors = self.volume.change_cluster_chain_to_sector_chain(self, chain_cluster)
+        
+        #Size of file
+        self.size = read_number_from_buffer(self.main_entry_of_rdet, 0x1C, 4)
+        
+        
+    
+    def show_attr(self):
+        check = {
+            16: 'D',
+            32: 'A',
+            1: 'R',
+            2: 'H',
+            4: 'S',
+            8: 'V'
+        }
+        list_attr = []
+        for attr in check:
+            if self.attr & attr == attr:
+                list_attr.append(check[attr])
+        return list_attr
+        
+    
+        
