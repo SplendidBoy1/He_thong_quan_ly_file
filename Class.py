@@ -14,12 +14,12 @@ class Item():
     
     @property
     @abstractmethod
-    def attr(self) -> list:
+    def attr(self) -> str:
         #All attributes of item
         pass
         
     @abstractmethod
-    def show_attr(self) -> list:
+    def show_attr(self) -> str:
         #Show all attributes
         pass
     

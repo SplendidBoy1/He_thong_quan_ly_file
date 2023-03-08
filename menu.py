@@ -50,7 +50,12 @@ class menu():
     def show_infor(self):
         self.volume.show_infor_volume()
     
-    def show_tree(self, entry, n = 0):
+    def show_tree(self, entry, n = 0, isrdet = True):
+        format_str = '{0: <30} {1: <8} {2: <8} {3: <8}\n'
+        if isrdet:
+            print_str = format_str.format('name', 'size', 'attr', 'sector')
+            print(print_str)
+
         if entry.subentries == None and entry.name == 'System Volume Information':
             return
         else:
@@ -58,10 +63,17 @@ class menu():
         for subentry in entry.subentries:
             if subentry.name == '.' or subentry.name == '..':
                 continue
-            print(' ' * n + '- ' + subentry.name)
+            subentry_info = {
+                'name': ' ' * n + ('- ' if n != 0 else '') + subentry.name, 
+                'size': '' if isinstance(subentry, Directory) else subentry.size, 
+                'attr': subentry.show_attr(),
+                'sector': '' if len(subentry.sectors) == 0 else subentry.sectors[0]
+            }
+            print_str = format_str.format(subentry_info['name'], subentry_info['size'], subentry_info['attr'], subentry_info['sector'])
+            print(print_str)
             if isinstance(subentry, FATFile):
                 continue
-            self.show_tree(subentry, n+1)
+            self.show_tree(subentry, n+1, False)
 
         
 

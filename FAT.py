@@ -83,7 +83,7 @@ class FATVolume():
         """
         #Sign of end in cluster
         end_sign = [0xFFFFFFF, 0xFFFFFF7, 0xFFFFFF8]
-        if n in end_sign:
+        if n in end_sign or n < 2:
             return []
         next_cluster = n
         chain = [next_cluster]
@@ -148,6 +148,7 @@ class FATDirectory(Directory):
         #list of subentries
         self.subentries = None
         
+        self.attr = read_number_from_buffer(data_buffer, 0xB, 1)
         if not isrdet:
             if len(lfn_entries) > 0:
                 lfn_entries.reverse()
@@ -156,7 +157,6 @@ class FATDirectory(Directory):
             else:
                 self.name = read_bytes_from_buffer(data_buffer, 0, 11).decode('utf-8', errors='ignore').strip()
             
-            self.attr = read_number_from_buffer(data_buffer, 0xB, 1)
             highbyte = read_number_from_buffer(data_buffer, 0x1B, 2)
             lowbyte = read_number_from_buffer(data_buffer, 0x1A, 2)
             self.cluster_begin = highbyte * 0x100 + lowbyte
@@ -221,10 +221,11 @@ class FATDirectory(Directory):
             4: 'S',
             8: 'V'
         }
-        list_attr = []
+
+        list_attr = ''
         for attr in check:
             if self.attr & attr == attr:
-                list_attr.append(check[attr])
+                list_attr += check[attr]
         return list_attr
         
 class FATFile(File):
@@ -253,7 +254,6 @@ class FATFile(File):
             name_ext = read_bytes_from_buffer(data_buffer, 8, 3).decode('utf-8')
             self.name = name_base + '.' + name_ext
 
-        
         # Phần Word(2 byte) cao
         highbytes = read_number_from_buffer(data_buffer, 0x14, 2)
         # Phần Word (2 byte) thấp
@@ -279,7 +279,7 @@ class FATFile(File):
         # "trim" bớt cho về đúng kích thước
         return binary_data[:self.size]
 
-    def describe_attr(self):
+    def show_attr(self):
         check = {
             16: 'D',
             32: 'A',
@@ -289,8 +289,8 @@ class FATFile(File):
             8: 'V'
         }
         
-        list_attr = []
+        list_attr = ''
         for attr in check:
             if self.attr & attr == attr:
-                list_attr.append(check[attr])
+                list_attr += check[attr]
         return list_attr
