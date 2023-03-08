@@ -34,7 +34,7 @@ class Directory(Item):
         #List of all subentries
         pass
         
-    def build_tree(self):
+    def get_subentries(self, entry, n = 0):
         #build a list of item
         pass
     

@@ -43,17 +43,25 @@ class menu():
             case '1':
                 self.show_infor()
             case '2':
-                self.show_tree()
+                self.show_tree(self.volume.main_directory)
             case '3':
                 return
     
     def show_infor(self):
         self.volume.show_infor_volume()
     
-    def show_tree(self):
-        self.volume.main_directory.get_subentries()
-        for subentry in self.volume.main_directory.subentries:
-            print(subentry.name)
+    def show_tree(self, entry, n = 0):
+        if entry.subentries == None and entry.name == 'System Volume Information':
+            return
+        else:
+            entry.get_subentries()
+        for subentry in entry.subentries:
+            if subentry.name == '.' or subentry.name == '..':
+                continue
+            print(' ' * n + '- ' + subentry.name)
+            if isinstance(subentry, FATFile):
+                continue
+            self.show_tree(subentry, n+1)
 
         
 

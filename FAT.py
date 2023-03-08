@@ -154,9 +154,7 @@ class FATDirectory(Directory):
                 self.name = FATVolume.read_subentry_to_name(lfn_entries)
                 lfn_entries.clear()
             else:
-                self.name = read_bytes_from_buffer(data_buffer, 0, 8)
-                self.name += read_bytes_from_buffer(data_buffer, 8, 3)
-                self.name = self.name.decode('utf-8')
+                self.name = read_bytes_from_buffer(data_buffer, 0, 11).decode('utf-8', errors='ignore').strip()
             
             self.attr = read_number_from_buffer(data_buffer, 0xB, 1)
             highbyte = read_number_from_buffer(data_buffer, 0x1B, 2)
@@ -168,7 +166,7 @@ class FATDirectory(Directory):
             self.name += read_bytes_from_buffer(data_buffer, 8, 3)
             self.name = self.name.decode('utf-8')
             self.cluster_begin = self.volume.root_cluster
-            self.path = ''
+            self.path_address = ''
             
         chain_cluster = self.volume.read_cluster_from_fat(self.cluster_begin)
         self.sectors = self.volume.change_cluster_chain_to_sector_chain(chain_cluster)
@@ -197,7 +195,7 @@ class FATDirectory(Directory):
                     subentry_index += 32
                     lfn_entries_queue.clear()
                     continue
-                self.subentries.append(FATDirectory(subentry_buffer, self.path, self.volume, lfn_entries=lfn_entries_queue))
+                self.subentries.append(FATDirectory(subentry_buffer, self.path_address, self.volume, lfn_entries=lfn_entries_queue))
             elif entry_type & 0x20 == 0x20:
                 # Is archive
                 isDeleted = read_number_from_buffer(sdet_buffer, subentry_index, 1)
@@ -205,7 +203,7 @@ class FATDirectory(Directory):
                     subentry_index += 32
                     lfn_entries_queue.clear()
                     continue
-                self.subentries.append(FATFile(subentry_buffer, self.path, self.volume, lfn_entries=lfn_entries_queue))
+                self.subentries.append(FATFile(subentry_buffer, self.path_address, self.volume, lfn_entries=lfn_entries_queue))
             elif entry_type & 0x0F == 0x0F:
                 # Is support entry
                 lfn_entries_queue.append(subentry_buffer)
@@ -230,17 +228,16 @@ class FATDirectory(Directory):
         return list_attr
         
 class FATFile(File):
-    volume = None 
-    name = None 
-    attr = None 
+    volume = None
+    name = None
+    attr = None
     sectors = None
-    path = None
+    path_address = None
+    cluster_begin = None
     size = None
 
-
-    def __init__(self, data_buffer, parent_path, volume, lfn_entries = []):
-        ...
-        self.entry_buffer = data_buffer
+    def __init__(self, data_buffer, parent_path, volume = FATVolume, lfn_entries = []):
+        
         self.volume = volume
 
         # Thuộc tính trạng thái
@@ -252,8 +249,8 @@ class FATFile(File):
             self.name = FATVolume.read_subentry_to_name(lfn_entries)
             lfn_entries.clear()
         else:
-            name_base = read_bytes_from_buffer(data_buffer, 0, 8).decode('utf-8', errors='ignore').strip()
-            name_ext = read_bytes_from_buffer(data_buffer, 8, 3).decode('utf-8', errors='ignore').strip()
+            name_base = read_bytes_from_buffer(data_buffer, 0, 8).decode('utf-8')
+            name_ext = read_bytes_from_buffer(data_buffer, 8, 3).decode('utf-8')
             self.name = name_base + '.' + name_ext
 
         
@@ -263,13 +260,13 @@ class FATFile(File):
         lowbytes = read_number_from_buffer(data_buffer, 0x1A, 2)
 
         # Cluster bắt đầu
-        self.begin_cluster = highbytes * 0x100 + lowbytes
+        self.cluster_begin = highbytes * 0x100 + lowbytes
 
         # Đường dẫn tập tin
-        self.path = parent_path + '/' + self.name
+        self.path_address = parent_path + '/' + self.name
 
-        cluster_chain = self.volume.read_cluster_chain(self.begin_cluster)
-        self.sectors = self.volume.cluster_chain_to_sector_chain(cluster_chain)
+        cluster_chain = self.volume.read_cluster_from_fat(self.cluster_begin)
+        self.sectors = self.volume.change_cluster_chain_to_sector_chain(cluster_chain)
 
         # Kích thước tập tin
         self.size = read_number_from_buffer(data_buffer,0x1C,4)
