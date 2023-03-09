@@ -7,6 +7,7 @@ import sys
 class Object():
     file_object = None
     volume = None
+    current_dir = None
     
     def __init__(self):
         address_name = Tool.input_directory()
@@ -23,4 +24,6 @@ class Object():
             print('NTFS was detected as a type of format volume')
             """ Add statement in there to detect NTFS"""
             sys.exit(0)
+        self.volume.root_directory.build_tree()
+        self.current_dir = self.volume.root_directory
         print('\n')
