@@ -241,10 +241,10 @@ class FATFile(File):
         
         self.volume = volume
 
-        # Thuộc tính trạng thái
+        # Attribute
         self.attr = read_number_from_buffer(data_buffer, 0xB, 1)
 
-        # Tên entry 
+        # Entry name 
         if len(lfn_entries) > 0:
             lfn_entries.reverse()
             self.name = FATVolume.read_subentry_to_name(lfn_entries)
@@ -254,29 +254,28 @@ class FATFile(File):
             name_ext = read_bytes_from_buffer(data_buffer, 8, 3).decode('utf-8')
             self.name = name_base + '.' + name_ext
 
-        # Phần Word(2 byte) cao
+        # Word(2 byte) high
         highbytes = read_number_from_buffer(data_buffer, 0x14, 2)
-        # Phần Word (2 byte) thấp
+        # Word (2 byte) low
         lowbytes = read_number_from_buffer(data_buffer, 0x1A, 2)
 
-        # Cluster bắt đầu
+        # Begin cluster
         self.cluster_begin = highbytes * 0x100 + lowbytes
 
-        # Đường dẫn tập tin
+        # File path
         self.path_address = parent_path + '/' + self.name
 
         cluster_chain = self.volume.read_cluster_from_fat(self.cluster_begin)
         self.sectors = self.volume.change_cluster_chain_to_sector_chain(cluster_chain)
 
-        # Kích thước tập tin
+        # Size of file
         self.size = read_number_from_buffer(data_buffer,0x1C,4)
     
     def dump_binary_data(self):
         """
-        Trả về mảng các byte của tập tin
+        Return data of text file in bytes
         """
         binary_data = read_list_of_sector(self.volume.file_object, self.sectors, self.volume.bps)
-        # "trim" bớt cho về đúng kích thước
         return binary_data[:self.size]
 
     def show_attr(self):

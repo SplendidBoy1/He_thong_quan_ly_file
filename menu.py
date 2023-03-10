@@ -33,17 +33,17 @@ class menu():
                     self.show_directory(self.object.volume.main_directory)
                 case '3':
                     return
-            os.system('pause')
             os.system('cls')
     
     
     def show_infor(self):
         self.object.volume.show_infor_volume()
+        os.system('pause')
     
     def show_directory(self, entry, n = 0, isrdet = True):
         format_str = '{0: <30} {1: <8} {2: <8} {3: <8}\n'
         if isrdet:
-            print_str = format_str.format('name', 'size', 'attr', 'sector')
+            print_str = format_str.format('NAME', 'SIZE', 'ATTR', 'SECTOR')
             print(print_str)
 
         if entry.subentries == None and entry.name == 'System Volume Information':
@@ -64,3 +64,37 @@ class menu():
             if isinstance(subentry, FATFile):
                 continue
             self.show_directory(subentry, n+1, False)
+        if isrdet:
+            self.file_interact(entry)
+
+    def file_interact(self, entry):
+        print('1. Go into directory')
+        print('2. View file data')
+
+        choice = input('Enter choice (1, 2 or others to go back): ')
+
+        os.system('cls')
+        if choice == '1':
+            check = 0
+            dirName = input('Input directory name: ')
+            for directory in entry.subentries:
+                if directory.name == dirName and isinstance(directory, Directory):
+                    check = 1
+                    self.show_directory(directory)
+                    self.show_directory(entry)
+                    break
+            if not check: 
+                print('Incorrect name or subject is not a directory!')
+        elif choice == '2':
+            check = 0
+            fileName = input('Input file name(including extensions): ')
+            for file in entry.subentries:
+                if file.name == fileName and '.txt' in fileName:
+                    check = 1
+                    data = file.dump_binary_data()
+                    data_to_text = data.decode('utf-8')
+                    print('\nText file data:\n' + data_to_text + '\n')
+                    os.system('pause')
+                    self.show_directory(entry)
+            if not check:
+                print('Incorrect name or subject is not a file!')

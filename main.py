@@ -7,6 +7,5 @@ def main():
     menu_instance = menu(object_instance)
     menu_instance.show()
     
-    
 if __name__ == '__main__':
     main()
