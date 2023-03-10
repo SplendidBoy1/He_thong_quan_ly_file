@@ -1,183 +1,309 @@
+'''
+Tham khảo NTFS:
+http://inform.pucp.edu.pe/~inf232/Ntfs/ntfs_doc_v0.5/index.html
+https://flatcap.github.io/linux-ntfs/ntfs/index.html
+'''
+
 from BytesReader import *
-from datetime import datetime, timedelta
+from AbstractBaseClasses import AbstractVolume, AbstractDirectory, AbstractFile
 
-ATTR_NAME = 48
-EPOCH_AS_FILETIME = 116444736000000000  # January 1, 1970 as MS file time
-
-
-class NTFSVolume():
-    # Override các abstract attribute
-    # Trong python để "khai báo" là mình sẽ override các abstract attribute của class cha thì mình khởi tạo giá trị đầu cho nó (ở đây khởi tạo là None [giống null của C++])
-    root_directory = None
+class NTFSVolume(AbstractVolume):
+    root_directory = None 
     size = None
-    volume_label = None
     file_object = None
 
     def __init__(self, file_object):
-        """
-        Constructor nhận vào 1 tham số là `file_object`, là một Python file object.
-        """
         self.file_object = file_object
 
-        # Đọc partition boot sector
-        PBS_buffer = read_sector(self.file_object, 0, 1)  # đọc sector thứ 0 (sector đầu tiên) và đọc 1 sector
+        # Đọc VBR của đĩa
+        VBR_buffer = read_sector(self.file_object, 0, 1)
 
-        # Đọc số byte/sector
-        self.sector_size = read_number_from_buffer(PBS_buffer, 0x0B, 2)
+        # Vùng BPB bắt đầu từ offset 0x0B đến 0x53 của VBR
 
-        # Đọc số sector/cluster
-        self.sc = read_number_from_buffer(PBS_buffer, 0x0D, 1)
-
-        # Đọc số sector để dành
-        self.sb = read_number_from_buffer(PBS_buffer, 0x0E, 2)
-
-        # Đọc tổng sector trong Volume
-        self.nv = read_number_from_buffer(PBS_buffer, 0x28, 8)
-
-        # Vị trí bắt đầu của MFT
-        self.mft_begin = self.sc * read_number_from_buffer(PBS_buffer, 0x30, 8)
-        
-        #Vị trí bắt đầu của MFT dự phòng
-        self.mft_mir = self.sc * read_number_from_buffer(PBS_buffer, 0x38, 8)
-        
-        # Đọc Bảng MFT
-        self.mft_table = read_sector(self.file_object, self.mft_begin, 1)
+        # Số byte/sector
+        self.bps = read_number_from_buffer(VBR_buffer, 0x0B, 2)
+        # Số sector/cluster
+        self.sc = read_number_from_buffer(VBR_buffer, 0x0D, 1)
+        # Số sector để dành
+        self.sb = read_number_from_buffer(VBR_buffer, 0x0E, 2)
+        # Tổng sector trong ổ đĩa
+        self.nv = read_number_from_buffer(VBR_buffer, 0x28, 8)
+        # Cluster bắt đầu của MFT
+        self.mft_begin = read_number_from_buffer(VBR_buffer, 0x30, 8)
+        # Từ đây, muốn truy cập tới MFT entry thứ n, thì tính sector bắt đầu của nó bằng self.sc * self.mft_begin + n * 2
 
         print('Volume information:')
-        print('Bytes per sector:', self.sector_size)
+        print('Bytes per sector:', self.bps)
         print('Sectors per cluster (Sc):', self.sc)
         print('Reserved sectors (Sb):', self.sb)
-        print('Sector number of logical drive (nv):', self.nv)
-        print('MFT begin sector:', self.mft_begin)
-        print('MFT Mirror begin sector:', self.mft_mir)
+        print('Total sectors of logical drive (nv):', self.nv)
+        print('MFT begin sector:', self.mft_begin * self.sc)
         print('\n')
 
-    def clusterChainToSectors(self, clusterChain):
-        # Hàm đổi danh sách các cluster thành danh sách các sector
-        sectors = []
-        for cluster in clusterChain:
-            for i in range(self.sc):
-                sectors.append(cluster * self.sc + i)
-        return sectors
+        # Không cần đọc buffer của MFT vì kích thước của nó không được nhắc đến
+        # Tuy nhiên, chú ý tới MFT entry số 5 là entry mô tả cho thư mục có tên "."
+        # Thư mục này chính là thư mục gốc của ổ đĩa theo format NTFS, từ đây ta đi tìm các thư mục/tập tin con của nó để tạo ra cây thư mục
+        
+        # Đọc thông tin của thư mục gốc tại entry số 5
+        # Đọc hai sector từ vị trí của entry số 5
+        root_entry_buffer = read_sector(self.file_object, self.mft_begin * self.sc + 5 * 2, 2, self.bps)
 
-    def readInfoEntry(self):
-        sectorsIndex = 0
-        skipped_entry = 0
-
-        while (sectorsIndex < self.nv):
-            skipped = False
-            attrTypeID = 99
-            attribOffset = 20   # 0x14
-
-            # mỗi lần duyệt 2 sector <=> 1024 bytes
-            buffer = read_sector(self.file_object, self.mft_begin + sectorsIndex, 2)
-
-            # Đọc chữ ký entry 
-            signature = read_bytes_from_buffer(buffer, 0, 4)
-            if signature != b'FILE':
-                sectorsIndex += 2
-                skipped_entry += 1
-
-                if skipped_entry > 100:
-                    break
-
+        # Đi tìm attribute $FILE_NAME của entry này
+        first_attribute = read_number_from_buffer(root_entry_buffer, 0x14, 2)
+        list_attr = None
+        while(True):
+            # Đọc mã attribute đang xét
+            type_id = read_number_from_buffer(root_entry_buffer, first_attribute, 4)
+            if type_id != 0x30: # $FILE_NAME
+                # Nếu khác attribute FILE_NAME thì skip attribute này
+                attr_length = read_number_from_buffer(root_entry_buffer, first_attribute + 4, 4)
+                first_attribute = first_attribute + attr_length
                 continue
+            else:
+                # Đọc offset đến nội dung attribute FILE_NAME
+                offset = read_number_from_buffer(root_entry_buffer, first_attribute + 0x14, 2)
+                # Đọc 4 bytes từ offset 0x38 của vùng nội dung để lấy giá trị flag
+                flag =  read_number_from_buffer(root_entry_buffer, first_attribute + offset + 0x38, 4)
+                list_attr = NTFSDirectory.show_attr(flag)
+                break
 
-            # Tổng số byte đã đọc của MFT entry
-            totalBytesRead = 0
-            # Đọc nơi bắt đầu (offset) của phần nội dung (attr đầu đọc tại byte thứ 20-21)
-            attribOffset = read_number_from_buffer(buffer, attribOffset, 2)
+        # Tạo thư mục gốc, biết size = 0, record number luôn là 5, tên luôn là "." và có list_attr là danh sách các thuộc tính của nó
+        self.root_directory = NTFSDirectory('.', 0, list_attr, self.file_object, 5, self.mft_begin, self.sc)
+        # Cần sử dụng hàm build_tree() để tạo cây thư mục cho biến này
+        # Sau đó dùng biến này để in cây thư mục (mẫu composite OOP)
+        
 
-            while True:
-                # Đọc mã loại attribute byte thứ 0-3
-                attrTypeID = read_number_from_buffer(buffer, attribOffset, 4)
-                # Mã loại: 0xFFFFFF: kết thúc MFT entry (hoặc đã đọc sang mft entry khác)
-                if attrTypeID in (0xFFFFFFFF, 0x0) or totalBytesRead >= 1024:
-                    break
+class NTFSDirectory(AbstractDirectory):
+    name = None
+    size = None
+    attr = None
+    file_object = None
+    record_number = None
+    subitem = None
+    sectors = None
+    mft_begin = None
+    sc = None
 
-                # Đọc kích thước attribute byte thứ 4-7
-                attrLength = read_number_from_buffer(buffer, attribOffset + 4, 4)
-                totalBytesRead += attrLength
+    def __init__(self, name, size, attr: list, file_oject, record_number, mft_begin, sc):
+        self.name = name
+        self.size = size
+        self.attr = attr
+        self.file_object = file_oject
+        self.record_number = record_number
+        self.subitem = []
+        self.mft_begin = mft_begin
+        self.sc = sc
 
-                # Đọc kiểu attribite (resident non-resident)
-                resident = read_number_from_buffer(buffer, attribOffset + 8, 1)
+        # Tính sector mà entry của directory này chiếm
+        self.sectors = [self.mft_begin * self.sc + self.record_number * 2, self.mft_begin * self.sc + self.record_number * 2 + 1]
 
-                if (resident > 1):
-                    break
+    def check_index_entry(self):
+        '''
+        Hàm dò attribute $INDEX_ROOT và $INDEX_ALLOCATION (nếu có) của một directory entry
+        Đọc các index entry mô tả trong attribute và thêm các item vào biến subitem
+        Trong trường hợp số index entry đủ để chứa trong MFT entry thì MFT entry này sẽ chỉ có $INDEX_ROOT
+        Ngược lại, các index entry sẽ được lưu ở vùng nhớ non-resident, được mô tả trong $INDEX_ALLOCATION được thêm ngay sau $INDEX_ROOT
+        '''
+        # Đi tìm attribute $INDEX_ROOT của entry mô tả thư mục này
+        entry_buffer = read_sector(self.file_object, self.mft_begin * self.sc + self.record_number * 2, 2, 512)
+        first_attribute = read_number_from_buffer(entry_buffer, 0x14, 2)
+        while(True):
+            # Đọc mã attribute đang xét
+            type_id = read_number_from_buffer(entry_buffer, first_attribute, 4)
+            attr_length = read_number_from_buffer(entry_buffer, first_attribute + 4, 4)
+            if type_id != 0x90:
+                # Nếu khác attribute INDEX_ROOT thì skip attribute này
+                first_attribute = first_attribute + attr_length
+                continue
+            else:
+                # Đọc offset đến nội dung attribute INDEX_ROOT
+                offset = read_number_from_buffer(entry_buffer, first_attribute + 0x14, 2)
 
-                # Đọc kích thước của phần nội dung attribute, đọc byte thứ 16-19
-                contentSize = read_number_from_buffer(buffer, attribOffset + 16, 4)
-                # Đọc nơi bắt đầu (offset) của phần nội dung attribute, đọc tại byte thứ 20-21)
-                contentOffset = read_number_from_buffer(buffer, attribOffset + 20, 2)
+                # Hai phần đầu của nội dung INDEX_ROOT là Index Root (16 bytes) và Index Header (16 bytes)
+                # Ta chỉ quan tâm giá trị flags trong Index Header (offset 0x0C tính từ đầu Index Header)
+                # Nếu flag là 0x00, các index là resident và nằm ngay sau Index Header
+                # Nếu flag là 0x01, các index là non-resident và nằm ở cluster được quy định bởi attribute kế tiếp là $INDEX_ALLOCATION
+                flag = read_number_from_buffer(entry_buffer, first_attribute + offset + 16 + 0x0C, 1)
+                if flag == 0x00:
+                    # Bảng index entry phía sau Index Header bao gồm nhiều entry, mỗi index entry cho thông tin về:
+                    #   Mã record number của file đang xét
+                    #   Mã record number của thư mục cha
+                    #   Kích thước file
+                    #   Flag của file
+                    #   Tên của file
+                    # Do đó, chỉ cần đọc index entry là đã có đầy đủ những thông tin cơ bản của file
 
-                if (attrTypeID == ATTR_NAME):  # Attribute loại $FILE_NAME
-                    # Đọc chiều dài tên tại byte thứ 64 (từ phần nội dung attr)
-                    nameLength = read_number_from_buffer(buffer, attribOffset + contentOffset + 64, 1)
-                    # Đọc tên tại byte thứ 66 (từ phần nội dung attr)
-                    name = read_bytes_from_buffer(buffer, attribOffset + contentOffset + 66, nameLength * 2)
-                    name = name.decode('utf-16le')
-
-                    if name.startswith('$'):
-                        skipped = True
-                        break
-
-                    # thời gian tạo tập tin, đọc byte thứ 8-15
-                    timeCreate = self.filetime_to_dt(read_number_from_buffer(buffer, attribOffset + contentOffset + 8, 8))
-                    # thời gian tập tin có sự thay đổi, đọc byte thứ 16-23
-                    timeModified = self.filetime_to_dt(read_number_from_buffer(buffer, attribOffset + contentOffset + 16, 8))
-                    # thời gian truy cập tập tin mới nhất, đọc byte thứ 32-39
-                    timeAccessed = self.filetime_to_dt(read_number_from_buffer(buffer, attribOffset + contentOffset + 32, 8))
-
-                fileRealSize = 0
-                if (attrTypeID == 0x80):  # Attribute loại $DATA
-                    # Nếu data là resident
-                    if resident == 0:
-                        # Nếu $DATA là resident thì kích thước file chính là kích thước của attribute trong MFT entry
-                        fileRealSize = contentSize
-                        # Đọc phần nội dung
-                        fileContent = read_bytes_from_buffer(buffer, attribOffset + contentOffset, contentSize)
-                        # Sector bắt đầu cũng chính là số sector của attribute
-                        fileSector = sectorsIndex
-                    # Nếu data là non-resident
-                    elif resident == 1:
-                        fileRunsOffset = read_number_from_buffer(buffer, attribOffset + 0x20, 2)
-                        # Nếu attribute là nonresident thì nó có chứa thêm size thực của attribute
-                        fileRealSize = read_number_from_buffer(buffer, attribOffset + 0x30, 7)
+                    # Đọc kích thước của bảng index entry
+                    size = read_number_from_buffer(entry_buffer, first_attribute + offset + 16 + 0x04, 4)
+                    cur_pos = 32
+                    while(True):
+                        # 8 byte đầu là mã record number (6 byte) và sequence (2 byte) của file đang xét
+                        record_number = read_number_from_buffer(entry_buffer, first_attribute + offset + cur_pos, 6)
+                        # 2 byte kế là kích thước entry này
+                        entry_size = read_number_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x08, 2)
+                        # Từ offset 0x10 lấy 8 byte là mã record number (6 byte) và sequence (2 byte) của thư mục cha
+                        parrent_record_number = read_number_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x10, 6)
                         
-                        if name.lower().endswith('.txt'):
-                            # 1 byte tại offset 1 của data của $DATA: số lượng cluster
-                            fileClusterNumber = read_number_from_buffer(buffer, attribOffset + fileRunsOffset + 1, 1)
-                            # 2 byte tại offset 2 của data của $DATA: chỉ số cluster đầu của vùng chứa data thực
-                            fileClusterBegin = read_number_from_buffer(buffer, attribOffset + fileRunsOffset + 2, 2)
-                            # Lập danh sách các cluster chứa data thực
-                            fileClusterList = [c for c in range(fileClusterBegin, fileClusterBegin + fileClusterNumber)]
-                            # Lập danh sách các sector chứa data thực 
-                            fileSectorList = self.clusterChainToSectors(fileClusterList)
-                            # Đọc nội dung thực 
-                            fileContent = read_list_of_sector(self.file_object, fileSectorList, self.sector_size)
-                    
-                attribOffset = (attribOffset + attrLength)
+                        if (parrent_record_number == self.record_number):
+                            # Đọc kích thước file
+                            file_size = read_number_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x40, 8)
+                            # Đọc flag và dịch thành list các attribute
+                            list_attr = NTFSDirectory.show_attr(read_number_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x48, 8))
+                            # Đọc độ dài tên file
+                            name_size = read_number_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x50, 1) * 2
+                            # Đọc tên file
+                            name = read_string_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x52, name_size)
 
-            if not skipped and not name.startswith('$'):
-                print('\nTên: {}\n'
-                        'Size: {}\n'
-                        'Sector begin: {}\n'
-                        'Create: {}\n'
-                        'Modified: {}\n'
-                        'Accessed: {}\n'.format(name, fileRealSize, sectorsIndex, timeCreate, timeModified, timeAccessed))
-                if name.lower().endswith('.txt'):
-                    print(fileContent.decode('utf-8'))
-                print('--------------------------------------------------------------')
+                            # Xác định item cần thêm vào subitem là directory hay file, với điều kiện không phải file hệ thống
+                            if 'System' not in list_attr:
+                                if 'Directory' in list_attr:
+                                    self.subitem.append(NTFSDirectory(name, file_size, list_attr, self.file_object, record_number, self.mft_begin, self.sc))
+                                elif 'Archive' in list_attr:
+                                    self.subitem.append(NTFSFile(name, file_size, list_attr, self.file_object, record_number, self.mft_begin, self.sc))
 
-            # Tăng vị trí sector lên 2 <=> 1024 bytes
-            sectorsIndex += 2
+                        cur_pos = cur_pos + entry_size
+                        if(size - cur_pos < 88):
+                            break
+                elif flag == 0x01:
+                    # Các index entry giờ được lưu ở vùng nhớ cho non-resident
+                    # Để xác định nó, ta tìm attribute FILE_ALLOCATION, nằm ngay sau FILE_ROOT
+                    first_attribute = first_attribute + attr_length
+                    # Đọc offset đến phần data runs của INDEX_ALLOCATION
+                    offset = read_number_from_buffer(entry_buffer, first_attribute + 0x20, 2)
+                    # Phần data runs gồm 3 - 8 bytes, trong đó cần chú ý đến cluster count (byte thứ 2) và first cluster (byte thứ 3 - 8)
+                    cluster_count = read_number_from_buffer(entry_buffer, first_attribute + offset + 0x01, 1)
+                    first_cluster = read_number_from_buffer(entry_buffer, first_attribute + offset + 0x02, 6)
+                    # Lập list các sector cần đọc
+                    sector_list = []
+                    for i in range (first_cluster * self.sc, (first_cluster + cluster_count) * self.sc):
+                        sector_list.append(i)
+                    entry_buffer = read_list_of_sector(self.file_object, sector_list, 512)
+
+                    # Tại offset 0x18 lấy 4 byte là offset đến entry đầu tiên
+                    # Tại offset 0x1C lấy 4 byte là kích thước của bảng index entry
+                    first_entry_offset = read_number_from_buffer(entry_buffer, 0x18, 4)
+                    size = read_number_from_buffer(entry_buffer, 0x1C, 4)
+                    cur_pos = 24 + first_entry_offset
+                    while(True):
+                        # 8 byte đầu là mã record number (6 byte) và sequence (2 byte) của file đang xét
+                        record_number = read_number_from_buffer(entry_buffer, cur_pos, 6)
+                        # 2 byte kế là kích thước entry này
+                        entry_size = read_number_from_buffer(entry_buffer, cur_pos + 0x08, 2)
+                        # Từ offset 0x10 lấy 8 byte là mã record number (6 byte) và sequence (2 byte) của thư mục cha
+                        parrent_record_number = read_number_from_buffer(entry_buffer, cur_pos + 0x10, 6)
+                        
+                        if (parrent_record_number == self.record_number):
+                            # Đọc kích thước file
+                            file_size = read_number_from_buffer(entry_buffer, cur_pos + 0x40, 8)
+                            # Đọc flag và dịch thành list các attribute
+                            list_attr = NTFSDirectory.show_attr(read_number_from_buffer(entry_buffer, cur_pos + 0x48, 8))
+                            # Đọc độ dài tên file
+                            name_size = read_number_from_buffer(entry_buffer, cur_pos + 0x50, 1) * 2
+                            # Đọc tên file
+                            name = read_string_from_buffer(entry_buffer, cur_pos + 0x52, name_size)
+
+                            # Xác định item cần thêm vào subitem là directory hay file, với điều kiện không phải file hệ thống
+                            if 'System' not in list_attr:
+                                if 'Directory' in list_attr:
+                                    self.subitem.append(NTFSDirectory(name, file_size, list_attr, self.file_object, record_number, self.mft_begin, self.sc))
+                                elif 'Archive' in list_attr:
+                                    self.subitem.append(NTFSFile(name, file_size, list_attr, self.file_object, record_number, self.mft_begin, self.sc))
+
+                        cur_pos = cur_pos + entry_size
+                        if(size - cur_pos < 88):
+                            break
+            break         
+
+    def build_tree(self):
+        '''
+        Hàm tạo cây thư mục, bắt đầu từ thư mục gốc "."
+        Sử dụng hàm check_index_entry để thêm vô biến subitem danh sách các thư mục/tập tin con
+        Sau đó duyệt qua danh sách thư mục/tập tin con, nếu phần tử đó là thư mục, đệ quy hàm này cho thư mục đó
+        '''
+        self.check_index_entry()
+        for item in self.subitem:
+            if 'Directory' in item.attr:
+                item.build_tree()
+            elif 'Archive' in item.attr and item.name.endswith('.txt'):
+                print(item.name)
+                item.get_data()     
 
     @staticmethod
-    def filetime_to_dt(ft):
-        '''
-            Đổi số nano giây ra ngày giờ
-        '''
-        us = (ft - EPOCH_AS_FILETIME) // 10
-        return datetime(1970, 1, 1) + timedelta(microseconds=us)
+    def show_attr(flag) -> list:
+        flags = {
+            0x0001 : 'Read-Only',
+            0x0002 : 'Hidden',
+            0x0004 : 'System',
+            0x0020 : 'Archive',
+            0x10000000 : 'Directory'
+        }
+        list_attr = []
+        for item in flags:
+            if flag & item == item:
+                list_attr.append(flags[item])
+        return list_attr
 
+class NTFSFile(AbstractFile):
+    name = None
+    size = None
+    attr = None
+    file_object = None
+    record_number = None
+    sectors = None
+    mft_begin = None
+    sc = None
+    data = None
 
+    def __init__(self, name, size, attr: list, file_oject, record_number, mft_begin, sc):
+        self.name = name
+        self.size = size
+        self.attr = attr
+        self.file_object = file_oject
+        self.record_number = record_number
+        self.mft_begin = mft_begin
+        self.sc = sc
+
+        # Tính sector mà entry của file này chiếm
+        self.sectors = [self.mft_begin * self.sc + self.record_number * 2, self.mft_begin * self.sc + self.record_number * 2 + 1]
+
+    def get_data(self):
+        '''
+        Hàm đọc dữ liệu cho file có định dạng txt
+        Để xài hàm này cần 2 điều kiện: trong biến attr có chứa 'Archive' và tên file kết thúc bằng '.txt'
+        Hàm bao gồm việc xử lý khi data thuộc vùng non-resident
+        '''
+        # Đi tìm attribute $DATA của MFT entry này
+        entry_buffer = read_sector(self.file_object, self.mft_begin * self.sc + self.record_number * 2, 2, 512)
+        first_attribute = read_number_from_buffer(entry_buffer, 0x14, 2)
+        print(first_attribute)
+        while(True):
+            # Đọc mã attribute đang xét
+            type_id = read_number_from_buffer(entry_buffer, first_attribute, 4)
+            attr_length = read_number_from_buffer(entry_buffer, first_attribute + 4, 4)
+            if type_id != 0x80:
+                # Nếu khác attribute DATA thì skip attribute này
+                first_attribute = first_attribute + attr_length
+                continue
+            else:
+                # Đọc cờ non-resident của attribute header
+                non_resident = read_number_from_buffer(entry_buffer, first_attribute + 0x08, 1)
+                # Check cờ non-resident, nếu = 0 thì dữ liệu nằm ngày sau phần attribute header, độ dài bằng size của file
+                if(non_resident == 0x00):
+                    # Đọc offset đến nội dung attribute DATA
+                    offset = read_number_from_buffer(entry_buffer, first_attribute + 0x14, 2)
+                    self.data = read_bytes_from_buffer(entry_buffer, first_attribute + offset, self.size).decode('utf-8','ignore')
+                # Nếu = 1, dữ liệu file nằm ở vùng nhớ non-resident, sau phần attribute header sẽ là data run, 
+                elif(non_resident == 0x01):
+                    # Đọc offset đến phần data run của attribute DATA
+                    offset = read_number_from_buffer(entry_buffer, first_attribute + 0x20, 2)
+                    # Phần data runs gồm 3 - 8 bytes, trong đó cần chú ý đến cluster count (byte thứ 2) và first cluster (byte thứ 3 - 8)
+                    cluster_count = read_number_from_buffer(entry_buffer, first_attribute + offset + 0x01, 1)
+                    first_cluster = read_number_from_buffer(entry_buffer, first_attribute + offset + 0x02, 6)
+                    # Lập list các sector cần đọc
+                    sector_list = []
+                    for i in range (first_cluster * self.sc, (first_cluster + cluster_count) * self.sc):
+                        sector_list.append(i)
+                    entry_buffer = read_list_of_sector(self.file_object, sector_list, 512)
+                    # Đọc data file
+                    self.data = read_bytes_from_buffer(entry_buffer, 0, self.size).decode('utf-8','ignore')
+            break

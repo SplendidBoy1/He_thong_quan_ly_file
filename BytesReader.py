@@ -56,5 +56,5 @@ def read_string_from_buffer(buffer,offset,size) -> str:
         size: độ dài của chuỗi bytes thể hiện chuỗi chữ
     '''
     buffer = read_bytes_from_buffer(buffer,offset,size)
-    result = buffer.decode('utf-8','ignore')
+    result = buffer.decode('utf-16le','ignore')
     return result
