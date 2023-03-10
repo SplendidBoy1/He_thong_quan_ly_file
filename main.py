@@ -1,9 +1,10 @@
 from BytesReader import *
 from menu import *
-import os
+from Object import *
 
 def main():
-    menu_instance = menu()
+    object_instance = Object()
+    menu_instance = menu(object_instance)
     menu_instance.show()
     
     
