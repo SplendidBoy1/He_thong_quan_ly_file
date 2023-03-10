@@ -60,6 +60,7 @@ class FATVolume():
         rdet_sector_chain = self.change_cluster_chain_to_sector_chain(rdet_clusters_chain)
         self.rdet_data = read_list_of_sector(self.file_object, rdet_sector_chain, self.bps)
         self.root_directory = FATDirectory(self.rdet_data, '', self, isrdet=True)
+        print(self.root_directory.sectors)
     
     def show_infor_volume(self):
         print('\n')
