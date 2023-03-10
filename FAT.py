@@ -212,7 +212,7 @@ class FATDirectory(Directory):
                 break
             subentry_index += 32
         
-    def show_attr(self):
+    def show_attr(self, flag):
         check = {
             16: 'D',
             32: 'A',
@@ -278,7 +278,7 @@ class FATFile(File):
         binary_data = read_list_of_sector(self.volume.file_object, self.sectors, self.volume.bps)
         return binary_data[:self.size]
 
-    def show_attr(self):
+    def show_attr(self, flag):
         check = {
             16: 'D',
             32: 'A',

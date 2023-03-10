@@ -56,12 +56,12 @@ class menu():
             subentry_info = {
                 'name': ' ' * n + ('- ' if n != 0 else '') + subentry.name, 
                 'size': '' if isinstance(subentry, Directory) else subentry.size, 
-                'attr': subentry.show_attr(),
+                'attr': subentry.show_attr() if isinstance(subentry, FATVolume) else subentry.attr,
                 'sector': '' if len(subentry.sectors) == 0 else subentry.sectors[0]
             }
             print_str = format_str.format(subentry_info['name'], subentry_info['size'], subentry_info['attr'], subentry_info['sector'])
             print(print_str)
-            if isinstance(subentry, FATFile):
+            if isinstance(subentry, (FATFile, NTFSFile)):
                 continue
             self.show_directory(subentry, n+1, False)
         if isrdet:
