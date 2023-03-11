@@ -73,7 +73,7 @@ class menu():
 
     def file_interact(self, entry):
         print('1. Go into directory')
-        print('2. View file data')
+        print('2. View text file data')
 
         choice = input('Enter choice (1, 2 or others to go back): ')
 
