@@ -18,6 +18,13 @@ class Volume():
         #Show all attributes
         pass
     
+    @abstractmethod
+    def show_infor_volume(self):
+        #show infor volume
+        pass
+    
+    
+    
     
     
 

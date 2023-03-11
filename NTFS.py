@@ -33,13 +33,7 @@ class NTFSVolume(Volume):
         self.mft_begin = read_number_from_buffer(VBR_buffer, 0x30, 8)
         # Từ đây, muốn truy cập tới MFT entry thứ n, thì tính sector bắt đầu của nó bằng self.sc * self.mft_begin + n * 2
 
-        print('Volume information:')
-        print('Bytes per sector:', self.bps)
-        print('Sectors per cluster (Sc):', self.sc)
-        print('Reserved sectors (Sb):', self.sb)
-        print('Total sectors of logical drive (nv):', self.nv)
-        print('MFT begin sector:', self.mft_begin * self.sc)
-        print('\n')
+        
 
         # Không cần đọc buffer của MFT vì kích thước của nó không được nhắc đến
         # Tuy nhiên, chú ý tới MFT entry số 5 là entry mô tả cho thư mục có tên "."
@@ -73,6 +67,14 @@ class NTFSVolume(Volume):
         # Cần sử dụng hàm build_tree() để tạo cây thư mục cho biến này
         # Sau đó dùng biến này để in cây thư mục (mẫu composite OOP)
         
+    def show_infor_volume(self):
+        print('Volume information:')
+        print('Bytes per sector:', self.bps)
+        print('Sectors per cluster (Sc):', self.sc)
+        print('Reserved sectors (Sb):', self.sb)
+        print('Total sectors of logical drive (nv):', self.nv)
+        print('MFT begin sector:', self.mft_begin * self.sc)
+        print('\n')
 
 class NTFSDirectory(Directory):
     name = None
