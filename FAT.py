@@ -149,6 +149,7 @@ class FATDirectory(Directory):
         self.subentries = None
         
         self.attr = read_number_from_buffer(data_buffer, 0xB, 1)
+        self.attr = self.show_attr(self.attr)
         if not isrdet:
             if len(lfn_entries) > 0:
                 lfn_entries.reverse()
@@ -212,7 +213,7 @@ class FATDirectory(Directory):
                 break
             subentry_index += 32
         
-    def show_attr(self):
+    def show_attr(self, flag):
         check = {
             16: 'D',
             32: 'A',
@@ -243,6 +244,7 @@ class FATFile(File):
 
         # Attribute
         self.attr = read_number_from_buffer(data_buffer, 0xB, 1)
+        self.attr = self.show_attr(self.attr)
 
         # Entry name 
         if len(lfn_entries) > 0:
@@ -278,7 +280,7 @@ class FATFile(File):
         binary_data = read_list_of_sector(self.volume.file_object, self.sectors, self.volume.bps)
         return binary_data[:self.size]
 
-    def show_attr(self):
+    def show_attr(self, flag):
         check = {
             16: 'D',
             32: 'A',
