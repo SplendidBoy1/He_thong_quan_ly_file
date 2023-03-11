@@ -92,8 +92,7 @@ class menu():
                 if file.name == fileName and '.txt' in fileName:
                     check = 1
                     data = file.dump_binary_data()
-                    data_to_text = data.decode('utf-8')
-                    print('\nText file data:\n' + data_to_text + '\n')
+                    print('\nText file data:\n' + data + '\n')
                     os.system('pause')
                     self.show_directory(entry)
             if not check:

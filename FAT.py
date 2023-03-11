@@ -237,6 +237,7 @@ class FATFile(File):
     path_address = None
     cluster_begin = None
     size = None
+    data = None
 
     def __init__(self, data_buffer, parent_path, volume = FATVolume, lfn_entries = []):
         
@@ -278,7 +279,7 @@ class FATFile(File):
         Return data of text file in bytes
         """
         binary_data = read_list_of_sector(self.volume.file_object, self.sectors, self.volume.bps)
-        return binary_data[:self.size]
+        return binary_data[:self.size].decode('utf-8')
 
     def show_attr(self, flag):
         check = {

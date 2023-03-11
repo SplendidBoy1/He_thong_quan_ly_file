@@ -314,5 +314,5 @@ class NTFSFile(File):
                     entry_buffer = read_list_of_sector(self.file_object, sector_list, 512)
                     # Đọc data file
                     self.data = read_bytes_from_buffer(entry_buffer, 0, self.size).decode('utf-8','ignore')
-                    return self.data
+                return self.data
             break
