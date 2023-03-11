@@ -15,6 +15,7 @@ class menu():
     """
     
     def __init__(self, object):
+        print("ssss")
         self.object = object
     
     def show(self):
