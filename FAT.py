@@ -253,8 +253,8 @@ class FATFile(File):
             self.name = FATVolume.read_subentry_to_name(lfn_entries)
             lfn_entries.clear()
         else:
-            name_base = read_bytes_from_buffer(data_buffer, 0, 8).decode('utf-8')
-            name_ext = read_bytes_from_buffer(data_buffer, 8, 3).decode('utf-8')
+            name_base = read_bytes_from_buffer(data_buffer, 0, 8).decode('utf-8').replace(" ", "")
+            name_ext = read_bytes_from_buffer(data_buffer, 8, 3).decode('utf-8').replace(" ", "").lower()
             self.name = name_base + '.' + name_ext
 
         # Word(2 byte) high
