@@ -22,9 +22,9 @@ class menu():
             
             print('MENU')
             print('1. Show information of volume')
-            print('2. Show a information of directory')
+            print('2. Show a directory tree with file\'s information')
             print('3. Exit program')
-            n = input('Input the a number to use option respectively: ')
+            n = input('Input a number to use the respective option: ')
             os.system('cls')
             match n:
                 case '1':
@@ -72,8 +72,8 @@ class menu():
             self.file_interact(entry)
 
     def file_interact(self, entry):
-        print('1. Go into directory')
-        print('2. View text file data')
+        print('1. Go into a directory')
+        print('2. View data of an archive')
 
         choice = input('Enter choice (1, 2 or others to go back): ')
 
@@ -92,7 +92,7 @@ class menu():
                 self.show_directory(entry)
         elif choice == '2':
             check = 0
-            fileName = input('Input file name(including extensions): ')
+            fileName = input('Input file\'s name (including extension, eg: text.txt): ')
             os.system('cls')
             for file in entry.subentries:
                 if file.name == fileName and '.txt' in fileName:

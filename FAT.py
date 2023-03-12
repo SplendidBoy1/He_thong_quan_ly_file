@@ -60,7 +60,6 @@ class FATVolume():
         self.main_directory = FATDirectory(self.rdet_data, '', self, isrdet=True)
 
     def show_infor_volume(self):
-        print('\n')
         print('Information of Volume:')
         print('Bytes per sector (bps): ', self.bps)
         print('Sector per cluster (sc): ', self.sc)
@@ -70,6 +69,7 @@ class FATVolume():
         print('RDET cluster: ', self.root_cluster)
         print('The first sector in data: ', self.data_begin_cluster)
         print('Size of volume: ', self.size_volume)
+        print('\n')
         return
     
     def read_cluster_from_fat(self, n) -> list:

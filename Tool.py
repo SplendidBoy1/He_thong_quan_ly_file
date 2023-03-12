@@ -20,7 +20,7 @@ class Tool():
                 print('Detected Windows NT platform')
                 print('Enter one CAPITAL LETTER of Volume')
                 while True:
-                    name_volume = input('=> Enter your address path:')
+                    name_volume = input('=> Enter your volume\'s address path: ')
                     if name_volume.isupper():
                         break
                     else:
@@ -28,7 +28,7 @@ class Tool():
                 address_path = '\\\\.\\' + name_volume + ':'
             else:
                 print('Enter the path of the volume. Exp: /dev/disk1, ...')
-                address_path = input('=> Enter your address path')
+                address_path = input('=> Enter your volume\'s address path ')
             print(address_path)
             print('\n')
             return address_path

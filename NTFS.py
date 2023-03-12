@@ -158,7 +158,7 @@ class NTFSDirectory(Directory):
                             # Đọc độ dài tên file
                             name_size = read_number_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x50, 1) * 2
                             # Đọc tên file
-                            name = read_string_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x52, name_size).replace('\x00', '')
+                            name = read_bytes_from_buffer(entry_buffer, first_attribute + offset + cur_pos + 0x52, name_size).decode('utf-16', 'ignore')
 
                             # Xác định item cần thêm vào subitem là directory hay file, với điều kiện không phải file hệ thống
                             if 'S' not in list_attr:
@@ -206,7 +206,7 @@ class NTFSDirectory(Directory):
                             # Đọc độ dài tên file
                             name_size = read_number_from_buffer(entry_buffer, cur_pos + 0x50, 1) * 2
                             # Đọc tên file
-                            name = read_string_from_buffer(entry_buffer, cur_pos + 0x52, name_size).replace('\x00', '')
+                            name = read_bytes_from_buffer(entry_buffer, cur_pos + 0x52, name_size).decode('utf-16' ,'ignore')
 
                             # Xác định item cần thêm vào subitem là directory hay file, với điều kiện không phải file hệ thống
                             if 'S' not in list_attr:
